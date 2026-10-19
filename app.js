@@ -8,6 +8,14 @@ const localDay=d=>[d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String
 const today=()=>localDay(new Date());
 const safe=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const money=n=>Number(n||0).toLocaleString('es-MX',{style:'currency',currency:'MXN'});
+const hora12 = valor => {
+  const m = String(valor ?? '').match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
+  if (!m) return String(valor ?? '');
+  const h=Number(m[1]),min=m[2];
+  if(h>23 || Number(min)>59) return String(valor);
+  return String(h%12 || 12)+':'+min+(h<12?' a. m.':' p. m.');
+};
+
 const notify=t=>{const e=$('#toast');e.textContent=t;e.classList.add('show');setTimeout(()=>e.classList.remove('show'),3500)};
 function save(){try{localStorage.setItem(KEY,JSON.stringify(db));return true}catch{notify('Sin espacio para guardar. Exporta un respaldo.');return false}}
 function commit(change){const old=JSON.stringify(db);change();if(!save()){db=JSON.parse(old);render();return false}render();return true}
@@ -17,7 +25,7 @@ const periodItems=(items,day,period)=>items.filter(x=>period==='day'?x.date===da
 const sum=(items,field)=>items.reduce((a,x)=>a+Number(x[field]||0),0);
 const countOrders=items=>items.reduce((a,x)=>a+(Number.isInteger(Number(x.count))&&Number(x.count)>0?Number(x.count):1),0);
 function cards(items,date){let day=periodItems(items,date,'day'),week=periodItems(items,date,'week'),month=periodItems(items,date,'month');const box=(label,value,wide=false)=>`<div class="card${wide?' wide':''}"><small>${label}</small><strong>${value}</strong></div>`;return box('Ganancia del día',money(sum(day,'amount')+sum(day,'tip')),true)+box('Pedidos del día',countOrders(day))+box('Propinas del día',money(sum(day,'tip')))+box('Ganancia semanal',money(sum(week,'amount')+sum(week,'tip')))+box('Pedidos de la semana',countOrders(week))+box('Ganancia mensual',money(sum(month,'amount')+sum(month,'tip')))+box('Pedidos del mes',countOrders(month))}
-function listOrders(items){const target=$('#mine-orders');if(!items.length){target.innerHTML='<p class="empty">No hay pedidos registrados en este día.</p>';return}target.innerHTML=items.slice().sort((a,b)=>(b.date+'T'+b.time).localeCompare(a.date+'T'+a.time)).map(o=>`<article class="entry"><div><strong>${safe(o.business||'Envío')}</strong><small>${safe(o.date)} · ${safe(o.time)} · ${Number(o.count)||1} pedido${Number(o.count)===1||!o.count?'':'s'} · Envío ${money(o.amount)} · Propina ${money(o.tip)}</small></div><div><div class="price">${money(o.amount+o.tip)}</div><div class="actions"><button data-edit="${safe(o.id)}">Editar</button><button data-delete="${safe(o.id)}">Borrar</button></div></div></article>`).join('')}
+function listOrders(items){const target=$('#mine-orders');if(!items.length){target.innerHTML='<p class="empty">No hay pedidos registrados en este día.</p>';return}target.innerHTML=items.slice().sort((a,b)=>(b.date+'T'+b.time).localeCompare(a.date+'T'+a.time)).map(o=>`<article class="entry"><div><strong>${safe(o.business||'Envío')}</strong><small>${safe(o.date)} · ${safe(hora12(o.time))} · ${Number(o.count)||1} pedido${Number(o.count)===1||!o.count?'':'s'} · Envío ${money(o.amount)} · Propina ${money(o.tip)}</small></div><div><div class="price">${money(o.amount+o.tip)}</div><div class="actions"><button data-edit="${safe(o.id)}">Editar</button><button data-delete="${safe(o.id)}">Borrar</button></div></div></article>`).join('')}
 function render(){document.body.classList.toggle('light',db.theme==='light');$('#theme').textContent=db.theme==='light'?'☾ Oscuro':'☀ Claro';const date=$('#mine-date').value||today();$('#mine-stats').innerHTML=cards(db.orders,date);listOrders(db.orders.filter(x=>x.date===date))}
 function openOrder(order=null){editOrder=order?.id||null;$('#order-heading').textContent=order?'Editar envío':'Nuevo envío';$('#order-business').value=order?.business||'';$('#order-amount').value=order?.amount??'';$('#order-tip').value=order?.tip??'';$('#order-date').value=order?.date||today();$('#order-count').value=order?.count||1;preview();$('#order-dialog').showModal()}
 function preview(){let amount=Number($('#order-amount').value)||0,tip=Number($('#order-tip').value)||0,count=Number($('#order-count').value)||1;$('#order-preview').textContent='Total del viaje: '+money(amount+tip)+' · '+count+' pedido'+(count===1?'':'s')}
